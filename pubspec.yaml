@@ -9,7 +9,16 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  cupertino_icons: ^1.0.2
+  sqflite: ^2.3.0
+  path: ^1.8.3
+  
+  camera: ^0.10.5+9              # Câmera
+  permission_handler: ^11.3.1    # Gerenciamento de permissões
+  sensors_plus: ^4.0.2           # Sensores (acelerômetro)
+  vibration: ^1.8.4              # Feedback tátil
+  geolocator: ^10.1.0            # GPS
+  geocoding: ^2.1.1              # Endereços
+  path_provider: ^2.1.1          # Diretórios do sistema
 
 dev_dependencies:
   flutter_test:
