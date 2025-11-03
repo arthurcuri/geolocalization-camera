@@ -167,12 +167,12 @@ flutter run -d macos
 
 ### Completed
 
-1. **Gallery Photos (Exercise **
+1. **Gallery Photos**
    - Option to select photos from gallery
    - Uses image_picker package
    - Integrated in camera service
 
-2. **Multiple Photos (Exercise 4)**
+2. **Multiple Photos**
    - Support for multiple photos per task
    - Photo gallery view
    - Individual photo deletion
