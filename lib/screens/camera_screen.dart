@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import '../services/camera_service.dart';
@@ -6,10 +5,7 @@ import '../services/camera_service.dart';
 class CameraScreen extends StatefulWidget {
   final CameraController controller;
 
-  const CameraScreen({
-    super.key,
-    required this.controller,
-  });
+  const CameraScreen({super.key, required this.controller});
 
   @override
   State<CameraScreen> createState() => _CameraScreenState();
@@ -21,7 +17,7 @@ class _CameraScreenState extends State<CameraScreen> {
   @override
   void initState() {
     super.initState();
-    
+
     if (!widget.controller.value.isInitialized) {
       widget.controller.initialize().then((_) {
         if (mounted) setState(() {});
@@ -37,7 +33,7 @@ class _CameraScreenState extends State<CameraScreen> {
     try {
       final image = await widget.controller.takePicture();
       final savedPath = await CameraService.instance.savePicture(image);
-      
+
       if (mounted) {
         Navigator.pop(context, savedPath);
       }
@@ -58,9 +54,7 @@ class _CameraScreenState extends State<CameraScreen> {
     if (!widget.controller.value.isInitialized) {
       return const Scaffold(
         backgroundColor: Colors.black,
-        body: Center(
-          child: CircularProgressIndicator(color: Colors.white),
-        ),
+        body: Center(child: CircularProgressIndicator(color: Colors.white)),
       );
     }
 
@@ -81,10 +75,7 @@ class _CameraScreenState extends State<CameraScreen> {
                 gradient: LinearGradient(
                   begin: Alignment.bottomCenter,
                   end: Alignment.topCenter,
-                  colors: [
-                    Colors.black.withOpacity(0.8),
-                    Colors.transparent,
-                  ],
+                  colors: [Colors.black.withOpacity(0.8), Colors.transparent],
                 ),
               ),
               child: SafeArea(
@@ -92,10 +83,14 @@ class _CameraScreenState extends State<CameraScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     IconButton(
-                      onPressed: _isCapturing 
-                        ? null 
-                        : () => Navigator.pop(context),
-                      icon: const Icon(Icons.close, color: Colors.white, size: 32),
+                      onPressed: _isCapturing
+                          ? null
+                          : () => Navigator.pop(context),
+                      icon: const Icon(
+                        Icons.close,
+                        color: Colors.white,
+                        size: 32,
+                      ),
                     ),
 
                     GestureDetector(
@@ -106,19 +101,23 @@ class _CameraScreenState extends State<CameraScreen> {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(color: Colors.white, width: 4),
-                          color: _isCapturing 
-                            ? Colors.grey.withOpacity(0.5)
-                            : Colors.transparent,
+                          color: _isCapturing
+                              ? Colors.grey.withOpacity(0.5)
+                              : Colors.transparent,
                         ),
                         child: _isCapturing
-                          ? const Padding(
-                              padding: EdgeInsets.all(20),
-                              child: CircularProgressIndicator(
+                            ? const Padding(
+                                padding: EdgeInsets.all(20),
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 3,
+                                ),
+                              )
+                            : const Icon(
+                                Icons.camera,
                                 color: Colors.white,
-                                strokeWidth: 3,
+                                size: 40,
                               ),
-                            )
-                          : const Icon(Icons.camera, color: Colors.white, size: 40),
                       ),
                     ),
 

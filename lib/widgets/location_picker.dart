@@ -45,8 +45,9 @@ class _LocationPickerState extends State<LocationPicker> {
     setState(() => _isLoading = true);
 
     try {
-      final result = await LocationService.instance.getCurrentLocationWithAddress();
-      
+      final result = await LocationService.instance
+          .getCurrentLocationWithAddress();
+
       if (result != null && mounted) {
         setState(() {
           _latitude = result['latitude'];
@@ -59,7 +60,7 @@ class _LocationPickerState extends State<LocationPicker> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('📍 Localização obtida!'),
+            content: Text('📍 Location obtained!'),
             backgroundColor: Colors.green,
             duration: Duration(seconds: 2),
           ),
@@ -67,7 +68,7 @@ class _LocationPickerState extends State<LocationPicker> {
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('❌ Não foi possível obter localização'),
+            content: Text('❌ Could not get location'),
             backgroundColor: Colors.red,
           ),
         );
@@ -75,10 +76,7 @@ class _LocationPickerState extends State<LocationPicker> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -109,14 +107,14 @@ class _LocationPickerState extends State<LocationPicker> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('📍 Endereço encontrado!'),
+            content: Text('📍 Address found!'),
             backgroundColor: Colors.green,
           ),
         );
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('❌ Endereço não encontrado'),
+            content: Text('❌ Address not found'),
             backgroundColor: Colors.orange,
           ),
         );
@@ -124,10 +122,7 @@ class _LocationPickerState extends State<LocationPicker> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -146,20 +141,17 @@ class _LocationPickerState extends State<LocationPicker> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Text(
-            'Selecionar Localização',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
+            'Select Location',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
-          
+
           const SizedBox(height: 16),
 
           TextField(
             controller: _addressController,
             decoration: InputDecoration(
-              labelText: 'Buscar endereço',
-              hintText: 'Ex: Av. Afonso Pena, 1000, BH',
+              labelText: 'Search address',
+              hintText: 'Ex: 123 Main St, New York, NY',
               prefixIcon: const Icon(Icons.search),
               suffixIcon: IconButton(
                 icon: const Icon(Icons.send),
@@ -198,7 +190,7 @@ class _LocationPickerState extends State<LocationPicker> {
                     ),
                   )
                 : const Icon(Icons.my_location),
-            label: Text(_isLoading ? 'Obtendo...' : 'Usar Localização Atual'),
+            label: Text(_isLoading ? 'Getting...' : 'Use Current Location'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.blue,
               foregroundColor: Colors.white,
@@ -220,7 +212,7 @@ class _LocationPickerState extends State<LocationPicker> {
                         const Icon(Icons.check_circle, color: Colors.green),
                         const SizedBox(width: 8),
                         const Text(
-                          'Localização selecionada',
+                          'Location selected',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             color: Colors.green,
@@ -230,20 +222,14 @@ class _LocationPickerState extends State<LocationPicker> {
                     ),
                     const SizedBox(height: 8),
                     if (_address != null)
-                      Text(
-                        _address!,
-                        style: const TextStyle(fontSize: 14),
-                      ),
+                      Text(_address!, style: const TextStyle(fontSize: 14)),
                     const SizedBox(height: 4),
                     Text(
                       LocationService.instance.formatCoordinates(
                         _latitude!,
                         _longitude!,
                       ),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                     ),
                   ],
                 ),

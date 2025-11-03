@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import '../models/task.dart';
+import '../models/category.dart';
 import '../services/database_service.dart';
-import '../services/sensor_service.dart';
 import '../services/location_service.dart';
-import '../services/camera_service.dart';
+import '../services/sensor_service.dart';
 import '../screens/task_form_screen.dart';
 import '../widgets/task_card.dart';
 
 class TaskListScreen extends StatefulWidget {
-  const TaskListScreen({super.key});
+  final VoidCallback onToggleTheme;
+  
+  const TaskListScreen({super.key, required this.onToggleTheme});
 
   @override
   State<TaskListScreen> createState() => _TaskListScreenState();
@@ -16,8 +18,9 @@ class TaskListScreen extends StatefulWidget {
 
 class _TaskListScreenState extends State<TaskListScreen> {
   List<Task> _tasks = [];
-  String _filter = 'all';
-  bool _isLoading = true;
+  String _filter = 'all'; // all, completed, pending
+  String? _categoryFilter; // null = todas categorias
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -41,12 +44,12 @@ class _TaskListScreenState extends State<TaskListScreen> {
 
   void _showShakeDialog() {
     final pendingTasks = _tasks.where((t) => !t.completed).toList();
-    
+
     if (pendingTasks.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('🎉 Nenhuma tarefa pendente!'),
-          backgroundColor: Colors.green,
+          content: Text('🎉 No pending tasks!'),
+          backgroundColor: Colors.pink,
         ),
       );
       return;
@@ -59,36 +62,37 @@ class _TaskListScreenState extends State<TaskListScreen> {
           children: const [
             Icon(Icons.vibration, color: Colors.blue),
             SizedBox(width: 8),
-            Expanded(child: Text('Shake detectado!')),
+            Expanded(child: Text('Shake detected!')),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Selecione uma tarefa para completar:'),
+            const Text('Select a task to complete:'),
             const SizedBox(height: 16),
-            ...pendingTasks.take(3).map((task) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(
-                task.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              trailing: IconButton(
-                icon: const Icon(Icons.check_circle, color: Colors.green),
-                onPressed: () => _completeTaskByShake(task),
-              ),
-            )),
+            ...pendingTasks
+                .take(3)
+                .map(
+                  (task) => ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      task.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.check_circle, color: Colors.pink),
+                      onPressed: () => _completeTaskByShake(task),
+                    ),
+                  ),
+                ),
             if (pendingTasks.length > 3)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
                   '+ ${pendingTasks.length - 3} outras',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
               ),
           ],
@@ -118,8 +122,8 @@ class _TaskListScreenState extends State<TaskListScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✅ "${task.title}" completa via shake!'),
-            backgroundColor: Colors.green,
+            content: Text('✅ "${task.title}" completed via shake!'),
+            backgroundColor: Colors.pink,
           ),
         );
       }
@@ -127,10 +131,7 @@ class _TaskListScreenState extends State<TaskListScreen> {
       Navigator.pop(context);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -138,37 +139,22 @@ class _TaskListScreenState extends State<TaskListScreen> {
 
   Future<void> _loadTasks() async {
     setState(() => _isLoading = true);
-
-    try {
-      final tasks = await DatabaseService.instance.readAll();
-      
-      if (mounted) {
-        setState(() {
-          _tasks = tasks;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao carregar: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
+    final tasks = await DatabaseService.instance.readAll(
+      categoryId: _categoryFilter,
+    );
+    setState(() {
+      _tasks = tasks;
+      _isLoading = false;
+    });
   }
 
   List<Task> get _filteredTasks {
     switch (_filter) {
-      case 'pending':
-        return _tasks.where((t) => !t.completed).toList();
       case 'completed':
         return _tasks.where((t) => t.completed).toList();
+      case 'pending':
+        return _tasks.where((t) => !t.completed).toList();
       case 'nearby':
-        // Implementar filtro de proximidade
         return _tasks;
       default:
         return _tasks;
@@ -180,7 +166,7 @@ class _TaskListScreenState extends State<TaskListScreen> {
     final completed = _tasks.where((t) => t.completed).length;
     final pending = total - completed;
     final completionRate = total > 0 ? ((completed / total) * 100).round() : 0;
-    
+
     return {
       'total': total,
       'completed': completed,
@@ -191,7 +177,7 @@ class _TaskListScreenState extends State<TaskListScreen> {
 
   Future<void> _filterByNearby() async {
     final position = await LocationService.instance.getCurrentLocation();
-    
+
     if (position == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -225,12 +211,19 @@ class _TaskListScreenState extends State<TaskListScreen> {
     }
   }
 
+  Future<void> _toggleTask(Task task) async {
+    final updated = task.copyWith(completed: !task.completed);
+    await DatabaseService.instance.update(updated);
+    await _loadTasks();
+  }
+
   Future<void> _deleteTask(Task task) async {
-    final confirm = await showDialog<bool>(
+    // Confirm deletion
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Confirmar exclusão'),
-        content: Text('Deseja deletar "${task.title}"?'),
+        title: const Text('Confirm deletion'),
+        content: Text('Do you really want to delete "${task.title}"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -239,95 +232,63 @@ class _TaskListScreenState extends State<TaskListScreen> {
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Deletar'),
+            child: const Text('Excluir'),
           ),
         ],
       ),
     );
 
-    if (confirm == true) {
-      try {
-        if (task.hasPhoto) {
-          await CameraService.instance.deletePhoto(task.photoPath!);
-        }
-        
-        await DatabaseService.instance.delete(task.id!);
-        await _loadTasks();
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('🗑️ Tarefa deletada'),
-              duration: Duration(seconds: 2),
-            ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Erro: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    }
-  }
-
-  Future<void> _toggleComplete(Task task) async {
-    try {
-      final updated = task.copyWith(
-        completed: !task.completed,
-        completedAt: !task.completed ? DateTime.now() : null,
-        completedBy: !task.completed ? 'manual' : null,
-      );
-
-      await DatabaseService.instance.update(updated);
+    if (confirmed == true) {
+      await DatabaseService.instance.delete(task.id);
       await _loadTasks();
-    } catch (e) {
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro: $e'),
-            backgroundColor: Colors.red,
+          const SnackBar(
+            content: Text('Task deleted'),
+            duration: Duration(seconds: 2),
           ),
         );
       }
     }
   }
 
+  Future<void> _openTaskForm([Task? task]) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => TaskFormScreen(task: task)),
+    );
+
+    if (result == true) {
+      await _loadTasks();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final stats = _statistics;
     final filteredTasks = _filteredTasks;
+    final stats = _calculateStats();
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Minhas Tarefas'),
-        backgroundColor: Colors.blue,
+        title: const Text('My Tasks'),
+        backgroundColor: Colors.pink,
         foregroundColor: Colors.white,
+        elevation: 2,
         actions: [
+          // Status Filter
           PopupMenuButton<String>(
             icon: const Icon(Icons.filter_list),
-            onSelected: (value) {
-              if (value == 'nearby') {
-                _filterByNearby();
-              } else {
-                setState(() {
-                  _filter = value;
-                  if (value != 'nearby') _loadTasks();
-                });
-              }
-            },
+            tooltip: 'Filter by status',
+            onSelected: (value) => setState(() => _filter = value),
             itemBuilder: (context) => [
               const PopupMenuItem(
                 value: 'all',
                 child: Row(
                   children: [
-                    Icon(Icons.list_alt),
+                    Icon(Icons.list),
                     SizedBox(width: 8),
-                    Text('Todas'),
+                    Text('All'),
                   ],
                 ),
               ),
@@ -335,9 +296,9 @@ class _TaskListScreenState extends State<TaskListScreen> {
                 value: 'pending',
                 child: Row(
                   children: [
-                    Icon(Icons.pending_outlined),
+                    Icon(Icons.pending),
                     SizedBox(width: 8),
-                    Text('Pendentes'),
+                    Text('Pending'),
                   ],
                 ),
               ),
@@ -345,157 +306,198 @@ class _TaskListScreenState extends State<TaskListScreen> {
                 value: 'completed',
                 child: Row(
                   children: [
-                    Icon(Icons.check_circle_outline),
+                    Icon(Icons.check_circle),
                     SizedBox(width: 8),
-                    Text('Concluídas'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'nearby',
-                child: Row(
-                  children: [
-                    Icon(Icons.near_me),
-                    SizedBox(width: 8),
-                    Text('Próximas'),
+                    Text('Completed'),
                   ],
                 ),
               ),
             ],
           ),
-          IconButton(
-            icon: const Icon(Icons.info_outline),
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('💡 Dicas'),
-                  content: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text('• Toque no card para editar'),
-                      SizedBox(height: 8),
-                      Text('• Marque como completa com checkbox'),
-                      SizedBox(height: 8),
-                      Text('• Sacuda o celular para completar rápido!'),
-                      SizedBox(height: 8),
-                      Text('• Use filtros para organizar'),
-                      SizedBox(height: 8),
-                      Text('• Adicione fotos e localização'),
-                    ],
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Entendi'),
-                    ),
+
+          // Category Filter
+          PopupMenuButton<String?>(
+            icon: Icon(
+              Icons.category,
+              color: _categoryFilter != null ? Colors.amber : Colors.white,
+            ),
+            tooltip: 'Filter by category',
+            onSelected: (value) async {
+              setState(() => _categoryFilter = value);
+              await _loadTasks();
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: null,
+                child: Row(
+                  children: [
+                    Icon(Icons.clear_all),
+                    SizedBox(width: 8),
+                    Text('All Categories'),
                   ],
                 ),
-              );
-            },
+              ),
+              const PopupMenuItem(
+                value: null,
+                enabled: false,
+                child: Divider(),
+              ),
+              ...Categories.all.map((category) {
+                return PopupMenuItem(
+                  value: category.id,
+                  child: Row(
+                    children: [
+                      Icon(
+                        Categories.getIconData(category.icon),
+                        color: category.color,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(category.name),
+                    ],
+                  ),
+                );
+              }),
+            ],
+          ),
+          // Botão de alternar tema (Light/Dark Mode)
+          IconButton(
+            icon: Icon(
+              Theme.of(context).brightness == Brightness.dark
+                  ? Icons.light_mode
+                  : Icons.dark_mode,
+            ),
+            tooltip: Theme.of(context).brightness == Brightness.dark
+                ? 'Light Mode'
+                : 'Dark Mode',
+            onPressed: widget.onToggleTheme,
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: _loadTasks,
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : Column(
-                children: [
-                  // CARD DE ESTATÍSTICAS
-                  Container(
-                    margin: const EdgeInsets.all(16),
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Colors.blue.shade400, Colors.blue.shade700],
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.blue.withOpacity(0.3),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        _StatItem(
-                          label: 'Total',
-                          value: stats['total'].toString(),
-                          icon: Icons.list_alt,
-                        ),
-                        Container(
-                          width: 1,
-                          height: 40,
-                          color: Colors.white.withOpacity(0.3),
-                        ),
-                        _StatItem(
-                          label: 'Concluídas',
-                          value: stats['completed'].toString(),
-                          icon: Icons.check_circle,
-                        ),
-                        Container(
-                          width: 1,
-                          height: 40,
-                          color: Colors.white.withOpacity(0.3),
-                        ),
-                        _StatItem(
-                          label: 'Taxa',
-                          value: '${stats['completionRate']}%',
-                          icon: Icons.trending_up,
-                        ),
-                      ],
-                    ),
-                  ),
 
-                  // LISTA DE TAREFAS
-                  Expanded(
-                    child: filteredTasks.isEmpty
-                        ? _buildEmptyState()
-                        : ListView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            itemCount: filteredTasks.length,
-                            itemBuilder: (context, index) {
-                              final task = filteredTasks[index];
-                              return TaskCard(
-                                task: task,
-                                onTap: () async {
-                                  final result = await Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => TaskFormScreen(task: task),
-                                    ),
-                                  );
-                                  if (result == true) _loadTasks();
-                                },
-                                onDelete: () => _deleteTask(task),
-                                onCheckboxChanged: (value) => _toggleComplete(task),
-                              );
-                            },
-                          ),
-                  ),
+      body: Column(
+        children: [
+          // Card de Estatísticas
+          if (_tasks.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [
+                    Colors.pink,
+                    Color(0xFFEC407A),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(blurRadius: 8, offset: const Offset(0, 4)),
                 ],
               ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const TaskFormScreen(),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildStatItem(
+                    Icons.list,
+                    'Total',
+                    stats['total'].toString(),
+                  ),
+                  _buildStatItem(
+                    Icons.pending_actions,
+                    'Pending',
+                    stats['pending'].toString(),
+                  ),
+                  _buildStatItem(
+                    Icons.check_circle,
+                    'Completed',
+                    stats['completed'].toString(),
+                  ),
+                  if (stats['overdue']! > 0)
+                    _buildStatItem(
+                      Icons.warning,
+                      'Overdue',
+                      stats['overdue'].toString(),
+                      isWarning: true,
+                    ),
+                ],
+              ),
             ),
-          );
-          if (result == true) _loadTasks();
-        },
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: const Text('Nova Tarefa'),
+
+          // Lista de Tarefas
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : filteredTasks.isEmpty
+                ? _buildEmptyState()
+                : RefreshIndicator(
+                    onRefresh: _loadTasks,
+                    child: ListView.builder(
+                      padding: const EdgeInsets.only(bottom: 80),
+                      itemCount: filteredTasks.length,
+                      itemBuilder: (context, index) {
+                        final task = filteredTasks[index];
+                        return TaskCard(
+                          task: task,
+                          onTap: () => _openTaskForm(task),
+                          onToggle: () => _toggleTask(task),
+                          onDelete: () => _deleteTask(task),
+                        );
+                      },
+                    ),
+                  ),
+          ),
+        ],
       ),
+
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _openTaskForm(),
+        icon: const Icon(Icons.add),
+        label: const Text('New Task'),
+        backgroundColor: Colors.pink,
+        foregroundColor: Colors.white,
+      ),
+    );
+  }
+
+  Widget _buildStatItem(
+    IconData icon,
+    String label,
+    String value, {
+    bool isWarning = false,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (isWarning)
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: Colors.red,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: Colors.white, size: 24),
+          )
+        else
+          Icon(icon, color: Colors.white, size: 32),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: isWarning ? 20 : 24,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.white70,
+            fontSize: isWarning ? 10 : 12,
+          ),
+        ),
+      ],
     );
   }
 
@@ -504,76 +506,46 @@ class _TaskListScreenState extends State<TaskListScreen> {
     IconData icon;
 
     switch (_filter) {
-      case 'pending':
-        message = '🎉 Nenhuma tarefa pendente!';
+      case 'completed':
+        message = 'No completed tasks yet';
         icon = Icons.check_circle_outline;
         break;
-      case 'completed':
-        message = '📋 Nenhuma tarefa concluída ainda';
-        icon = Icons.pending_outlined;
-        break;
-      case 'nearby':
-        message = '📍 Nenhuma tarefa próxima';
-        icon = Icons.near_me;
+      case 'pending':
+        message = 'No pending tasks';
+        icon = Icons.pending_actions;
         break;
       default:
-        message = '📝 Nenhuma tarefa ainda.\nToque em + para criar!';
-        icon = Icons.add_task;
+        message = 'No tasks created';
+        icon = Icons.task_alt;
     }
 
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 80, color: Colors.grey[300]),
+          Icon(icon, size: 100, color: Colors.grey.shade300),
           const SizedBox(height: 16),
           Text(
             message,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[600],
-            ),
+            style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
+          ),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: () => _openTaskForm(),
+            icon: const Icon(Icons.add),
+            label: const Text('Criar primeira tarefa'),
           ),
         ],
       ),
     );
   }
-}
 
-class _StatItem extends StatelessWidget {
-  final String label;
-  final String value;
-  final IconData icon;
-
-  const _StatItem({
-    required this.label,
-    required this.value,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Icon(icon, color: Colors.white, size: 28),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.9),
-            fontSize: 12,
-          ),
-        ),
-      ],
-    );
+  Map<String, int> _calculateStats() {
+    return {
+      'total': _tasks.length,
+      'completed': _tasks.where((t) => t.completed).length,
+      'pending': _tasks.where((t) => !t.completed).length,
+      'overdue': _tasks.where((t) => t.isOverdue).length,
+    };
   }
 }
